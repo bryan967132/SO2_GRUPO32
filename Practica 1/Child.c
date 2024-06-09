@@ -48,7 +48,7 @@ void perform_syscalls() {
                 }
                 break;
         }
-        sleep(1 + rand() % 3) // random exec time 
+        sleep(1 + rand() % 3); // random exec time 
     }
 }
 
