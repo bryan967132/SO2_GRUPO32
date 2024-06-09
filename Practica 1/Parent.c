@@ -81,7 +81,7 @@ int main() {
         if ((children[i] = fork()) == 0) {
             ptrace(PTRACE_TRACEME, 0, 0, 0);
             kill(getpid(), SIGSTOP); // Esperar hasta que el padre esté listo para rastrear
-            execl("./child", "./child", "Hola", "Soy el Proceso Hijo!", NULL);
+            execl("./child.bin", "child.bin", "Hola", "Soy el Proceso Hijo!", NULL);
             perror("execl");
             exit(1);
         } else if (children[i] == -1) {
