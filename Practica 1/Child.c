@@ -53,9 +53,7 @@ void perform_syscalls() {
 }
 
 int main(int argc, char *argv[]) {
-    printf("Argumento 1: %s\n", argv[1]);
-    printf("Argumento 2: %s\n", argv[2]);
-
+    printf("Soy el hijo %d\n", getpid());
     srand(time(NULL));
     perform_syscalls();
 
