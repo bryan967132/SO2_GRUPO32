@@ -94,19 +94,20 @@ int main() {
             printf("Proceso hijo creado con PID: %d\n", children[i]);
             childs ++;
         }
-        if(childs == NUM_CHILDREN && start_systemtap == 0) {
-            // Ejecución de comando systemstap
-            char command[256];
-            sprintf(command, "sudo stap syscall_monitor.stp %d %d > log.log 2>/dev/null &", children[0], children[1]);
-            printf("Ejecutando: %s\n", command);
-            int result = system(command);
-            if (result == -1) {
-                perror("Error ejecutando systemtap");
-                exit(1);
-            }
-            childs = -1;
-            start_systemtap = 1;
+    }
+
+    if(childs == NUM_CHILDREN && start_systemtap == 0) {
+        // Ejecución de comando systemstap
+        char command[256];
+        sprintf(command, "sudo stap syscall_monitor.stp %d %d > log.log 2>/dev/null &", children[0], children[1]);
+        printf("Ejecutando: %s\n", command);
+        int result = system(command);
+        if (result == -1) {
+            perror("Error ejecutando systemtap");
+            exit(1);
         }
+        childs = -1;
+        start_systemtap = 1;
     }
 
     for (int i = 0; i < NUM_CHILDREN; i++) {
