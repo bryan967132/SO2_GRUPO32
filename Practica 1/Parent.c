@@ -82,8 +82,8 @@ int main() {
 
     for (int i = 0; i < NUM_CHILDREN; i++) {
         if ((children[i] = fork()) == 0) {
-            ptrace(PTRACE_TRACEME, 0, 0, 0);
-            kill(getpid(), SIGSTOP); // Esperar hasta que el padre esté listo para rastrear
+            // ptrace(PTRACE_TRACEME, 0, 0, 0);
+            // kill(getpid(), SIGSTOP); // Esperar hasta que el padre esté listo para rastrear
             execl("./child.bin", "child.bin", "Hola", "Soy el Proceso Hijo!", NULL);
             perror("execl");
             exit(1);
@@ -112,8 +112,8 @@ int main() {
     for (int i = 0; i < NUM_CHILDREN; i++) {
         // Esperar a que el hijo se detenga
         waitpid(children[i], NULL, 0);
-        ptrace(PTRACE_SYSCALL, children[i], 0, 0); // Empezar la traza
-        trace_child(children[i]);
+        // ptrace(PTRACE_SYSCALL, children[i], 0, 0); // Empezar la traza
+        // trace_child(children[i]);
     }
 
     fclose(log_file);
