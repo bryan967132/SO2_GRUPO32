@@ -1,0 +1,10 @@
+[
+    {"operacion": 1, "cuenta1": 123456, "cuenta2": 0, "monto": 1000.00},
+    {"operacion": 2, "cuenta1": 777888, "cuenta2": 0, "monto": 75.00},
+    {"operacion": 3, "cuenta1": 555666, "cuenta2": 444555, "monto": 200.00},
+    {"operacion": 1, "cuenta1": 101010, "cuenta2": 0, "monto": 150.25},
+    {"operacion": 2, "cuenta1": 171717, "cuenta2": 0, "monto": 50.50},
+    {"operacion": 3, "cuenta1": 191919, "cuenta2": 121212, "monto": 300.00},
+    {"operacion": 1, "cuenta1": 131313, "cuenta2": 0, "monto": 200.00},
+    {"operacion": 2, "cuenta1": 181818, "cuenta2": 0, "monto": 150.75}
+]
