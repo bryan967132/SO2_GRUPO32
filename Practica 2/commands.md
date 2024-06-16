@@ -1,4 +1,5 @@
 
 
 -- Ejecutar 
-gcc -o data dataLoad.c -ljansson -lpthread
+gcc -o Multithreading_dataLoad_exec Multithreading_dataLoad.c -ljansson -lpthread
+./Multithreading_dataLoad_exec
