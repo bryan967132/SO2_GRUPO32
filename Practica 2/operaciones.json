@@ -1,0 +1,5 @@
+[
+    {"operacion": 1, "cuenta1": 1, "cuenta2": 2, "monto": 100.00},
+    {"operacion": 2, "cuenta1": 3, "cuenta2": 4, "monto": 50.00},
+    {"operacion": 3, "cuenta1": 4, "cuenta2": 5, "monto": 25.00}
+]
