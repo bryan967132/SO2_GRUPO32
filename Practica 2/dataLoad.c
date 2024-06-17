@@ -10,13 +10,13 @@
 #define MAX_OPERATIONS 1000
 
 typedef struct {
+    int linea;
     int no_cuenta;
     char nombre[100];
     double saldo;
 } Usuario;
 
 typedef struct {
-    int linea;
     int operacion; // 1: Deposito, 2: Retiro, 3: Transferencia
     int cuenta1;
     int cuenta2; // Solo usado en transferencias
@@ -41,12 +41,15 @@ int errorCargaO = 0;
 ReporteOperaciones r2 = { .hilos = {0, 0, 0, 0}, .operaciones = {0, 0, 0}, .errores = {0} };
 
 Usuario usuarios[MAX_USERS];
+Usuario usuariosTmp[MAX_USERS];
 Operacion operaciones[MAX_OPERATIONS];
 int num_usuarios = 0;
 int num_operaciones = 0;
 int lineas_usuarios = 0;
 int lineas_operaciones = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int procesado[3];
 
 // Declaraciones de funciones
 char* fecha_hora(char* formato);
@@ -79,43 +82,13 @@ void* cargar_usuarios(void* i) {
     size_t index;
     json_t *user;
     json_array_foreach(root, index, user) {
-        pthread_mutex_lock(&mutex);
-        int no_cuenta = json_integer_value(json_object_get(user, "no_cuenta"));
+        usuariosTmp[lineas_usuarios].linea = lineas_usuarios + 1;
+        usuariosTmp[lineas_usuarios].no_cuenta = json_integer_value(json_object_get(user, "no_cuenta"));
         const char* nombre = json_string_value(json_object_get(user, "nombre"));
-        double saldo = json_real_value(json_object_get(user, "saldo"));
+        strncpy(usuarios[num_usuarios].nombre, nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
+        usuariosTmp[lineas_usuarios].saldo = json_real_value(json_object_get(user, "saldo"));
 
         lineas_usuarios++;
-
-        // Verificar si el número de cuenta ya existe
-        int i;
-        int duplicado = 0;
-        for (i = 0; i < num_usuarios; ++i) {
-            if (usuarios[i].no_cuenta == no_cuenta) {
-                sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta duplicado %d", lineas_usuarios, no_cuenta);
-                errorCargaU++;
-                duplicado = 1;
-                break;
-            }
-        }
-        // Verificar si el número de cuenta o el saldo son negativos
-        if(no_cuenta <= 0) {
-            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta no puede ser menor que 0", lineas_usuarios);
-            errorCargaU++;
-            continue;
-        } else if(saldo < 0) {
-            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Saldo no puede ser menor que 0", lineas_usuarios);
-            errorCargaU++;
-            continue;
-        }
-
-        if(!duplicado) {
-            // Agregar usuario al arreglo
-            usuarios[num_usuarios].no_cuenta = no_cuenta;
-            strncpy(usuarios[num_usuarios].nombre, nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
-            usuarios[num_usuarios].saldo = saldo;
-            num_usuarios++;
-        }
-        pthread_mutex_unlock(&mutex);
     }
     json_decref(root);
     return NULL;
@@ -299,20 +272,62 @@ void consultar_cuenta(int no_cuenta) {
         }
     }
     printf("\x1b[31m" "Número de cuenta no encontrado: %d\n" "\x1b[0m", no_cuenta);
+    pthread_mutex_unlock(&mutex);
+}
+
+
+void generar_numeros(int n, int* a, int* b, int* c) {
+    int max_diff = 4;
+
+    // Generar un número aleatorio en un rango razonable
+    *a = rand() % (n + 1);
+
+    // Generar dos números aleatorios dentro del rango ajustado
+    *b = *a + (rand() % (2 * max_diff + 1)) - max_diff;
+    *c = *a + (rand() % (2 * max_diff + 1)) - max_diff;
+
+    // Ajustar el tercer número para que la suma sea n
+    *c = n - *a - *b;
+
+    // Asegurar que los números no tengan más de 4 unidades de diferencia
+    if (abs(*a - *b) > max_diff || abs(*a - *c) > max_diff || abs(*b - *c) > max_diff) {
+        generar_numeros(n, a, b, c);  // Intentar de nuevo si la diferencia es demasiado grande
+    }
 }
 
 void* procesar_usuarios(void* arg) {
     int thread_id = *(int*)arg;
-    int total_threads = 3;
-    int usuarios_por_hilo = num_usuarios / total_threads;
-    int start = thread_id * usuarios_por_hilo;
-    int end = (thread_id == total_threads - 1) ? num_usuarios : start + usuarios_por_hilo;
+    int start = thread_id == 0 ? 0 : (thread_id == 1 ? procesado[0] : procesado[0] + procesado[1]);
+    int end = thread_id == 0 ? procesado[0] : (thread_id == 1 ? procesado[0] + procesado[1] : procesado[0] + procesado[1] + procesado[2]);
 
-    r1.hilos[thread_id] = 0;
-    for (int i = start; i < num_usuarios; ++i) {
-        // Simula algún procesamiento para el usuario
-        // printf("Hilo %d procesando usuario %d\n", thread_id, usuarios[i].no_cuenta);
-        r1.hilos[thread_id]++;
+    for(int x = start; x < end; x ++) {
+        int duplicado = 0;
+        for(int i = 0; i < lineas_usuarios; i ++) {
+            if(usuarios[i].no_cuenta == usuariosTmp[x].no_cuenta) {
+                sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta duplicado %d", usuariosTmp[x].linea, usuariosTmp[x].no_cuenta);
+                errorCargaU++;
+                duplicado = 1;
+                break;
+            }
+        }
+        if(usuariosTmp[x].no_cuenta <= 0) {
+            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta no puede ser menor que 0", usuariosTmp[x].linea);
+            errorCargaU++;
+            continue;
+        } else if(usuariosTmp[x].saldo < 0) {
+            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Saldo no puede ser menor que 0", usuariosTmp[x].linea);
+            errorCargaU++;
+            continue;
+        }
+
+        if(!duplicado) {
+            // Agregar usuario al arreglo
+            usuarios[num_usuarios].no_cuenta = usuariosTmp[x].no_cuenta;
+            strncpy(usuarios[num_usuarios].nombre, usuariosTmp[x].nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
+            usuarios[num_usuarios].saldo = usuariosTmp[x].saldo;
+            num_usuarios++;
+            r1.hilos[thread_id]++;
+        }
     }
     return NULL;
 }
@@ -480,9 +495,12 @@ int main() {
 
     printf("\x1b[32m" "\nCarga de Usuarios...\n" "\x1b[0m");
 
+
     // Cargar usuarios en un solo hilo
     pthread_create(&threads[0], NULL, cargar_usuarios, &thread_ids[0]);
     pthread_join(threads[0], NULL);
+
+    generar_numeros(lineas_usuarios, &procesado[0], &procesado[1], &procesado[2]);
 
     // Procesar usuarios en 3 hilos
     for (int i = 0; i < 3; i++) {
