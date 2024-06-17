@@ -290,16 +290,15 @@ void transferencia(int cuenta_origen, int cuenta_destino, double monto, int inde
 }
 
 void consultar_cuenta(int no_cuenta) {
-    pthread_mutex_lock(&mutex);
     for (int i = 0; i < num_usuarios; ++i) {
         if (usuarios[i].no_cuenta == no_cuenta) {
+            printf("\n--------------------------\n");
             printf("Número de cuenta: %d\nNombre: %s\nSaldo: %.2f\n", usuarios[i].no_cuenta, usuarios[i].nombre, usuarios[i].saldo);
             pthread_mutex_unlock(&mutex);
             return;
         }
     }
     printf("\x1b[31m" "Número de cuenta no encontrado: %d\n" "\x1b[0m", no_cuenta);
-    pthread_mutex_unlock(&mutex);
 }
 
 void* procesar_usuarios(void* arg) {
@@ -485,7 +484,7 @@ int main() {
     pthread_create(&threads[0], NULL, cargar_usuarios, &thread_ids[0]);
     pthread_join(threads[0], NULL);
 
-    // Procesar usuarios en 4 hilos
+    // Procesar usuarios en 3 hilos
     for (int i = 0; i < 3; i++) {
         pthread_create(&threads[i], NULL, procesar_usuarios, &thread_ids[i]);
     }
