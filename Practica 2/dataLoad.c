@@ -81,21 +81,49 @@ void* cargar_usuarios(void* i) {
 
     size_t index;
     json_t *user;
-    json_array_foreach(root, index, user) {
-        usuariosTmp[lineas_usuarios].linea = lineas_usuarios + 1;
-        usuariosTmp[lineas_usuarios].no_cuenta = json_integer_value(json_object_get(user, "no_cuenta"));
-        strncpy(usuariosTmp[lineas_usuarios].nombre, json_string_value(json_object_get(user, "nombre")), sizeof(usuariosTmp[lineas_usuarios].nombre) - 1);
-        usuariosTmp[lineas_usuarios].saldo = json_real_value(json_object_get(user, "saldo"));
+    int thread_id = *(int*) i;
+    int start = thread_id == 0 ? 0 : (thread_id == 1 ? procesado[0] : procesado[0] + procesado[1]);
+    int end = thread_id == 0 ? procesado[0] : (thread_id == 1 ? procesado[0] + procesado[1] : procesado[0] + procesado[1] + procesado[2]);
+    for (index = start; index < end && (user = json_array_get(root, index)); index++) {
+        int no_cuenta = json_integer_value(json_object_get(user, "no_cuenta"));
+        const char* nombre = json_string_value(json_object_get(user, "nombre"));
+        double saldo = json_real_value(json_object_get(user, "saldo"));
 
         lineas_usuarios++;
+        int duplicado = 0;
+        for(int i = 0; i < lineas_usuarios; i ++) {
+            if(usuarios[i].no_cuenta == no_cuenta) {
+                sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta duplicado %d", lineas_usuarios, no_cuenta);
+                errorCargaU++;
+                duplicado = 1;
+                break;
+            }
+        }
+        if(no_cuenta <= 0) {
+            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta no puede ser menor que 0", lineas_usuarios);
+            errorCargaU++;
+            continue;
+        } else if(saldo < 0) {
+            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Saldo no puede ser menor que 0", lineas_usuarios);
+            errorCargaU++;
+            continue;
+        }
+
+        if(!duplicado) {
+            // Agregar usuario al arreglo
+            usuarios[num_usuarios].no_cuenta = no_cuenta;
+            strncpy(usuarios[num_usuarios].nombre, nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
+            usuarios[num_usuarios].saldo = saldo;
+            num_usuarios++;
+            r1.hilos[thread_id]++;
+        }
     }
-    json_decref(root);
     return NULL;
 }
 
 // Función para realizar operaciones desde un archivo JSON
 void* cargar_operaciones(void* arg) {
-    const char* file = (const char*)arg;
+    const char* file = "operaciones.json";
     json_error_t error;
     json_t *root = json_load_file(file, 0, &error);
     if (!root) {
@@ -105,7 +133,8 @@ void* cargar_operaciones(void* arg) {
 
     size_t index;
     json_t *operation;
-    json_array_foreach(root, index, operation) {
+    int thread_id = *(int*) arg;
+    for (index = thread_id; index < json_array_size(root) && (operation = json_array_get(root, index)); index+=4) {
         pthread_mutex_lock(&mutex);
         if (num_operaciones >= MAX_OPERATIONS) {
             printf("Error: Demasiadas operaciones\n");
@@ -117,10 +146,32 @@ void* cargar_operaciones(void* arg) {
         operaciones[num_operaciones].cuenta1 = json_integer_value(json_object_get(operation, "cuenta1"));
         operaciones[num_operaciones].cuenta2 = json_integer_value(json_object_get(operation, "cuenta2"));
         operaciones[num_operaciones].monto = json_real_value(json_object_get(operation, "monto"));
+
+        int operacion = operaciones[num_operaciones].operacion;
+        int cuenta1 = operaciones[num_operaciones].cuenta1;
+        int cuenta2 = operaciones[num_operaciones].cuenta2;
+        double monto = operaciones[num_operaciones].monto;
+
+        lineas_operaciones ++;
+
+        switch (operacion) {
+            case 1:
+                deposito(cuenta1, monto, thread_id, 1);
+                break;
+            case 2:
+                retiro(cuenta1, monto, thread_id, 1);
+                break;
+            case 3:
+                transferencia(cuenta1, cuenta2, monto, thread_id, 1);
+                break;
+            default:
+                printf("Operación desconocida: %d\n", operacion);
+                break;
+        }
+
         num_operaciones++;
         pthread_mutex_unlock(&mutex);
     }
-    json_decref(root);
     // printf("termina: %s\n", filename);
     return NULL;
 }
@@ -136,7 +187,6 @@ void deposito(int no_cuenta, double monto, int index, int esCarga) {
         }
         return;
     }
-    pthread_mutex_lock(&mutex);
     for (int i = 0; i < num_usuarios; ++i) {
         if (usuarios[i].no_cuenta == no_cuenta) {
             usuarios[i].saldo += monto;
@@ -146,7 +196,6 @@ void deposito(int no_cuenta, double monto, int index, int esCarga) {
             } else {
                 printf("\x1b[32m" "Depósito exitoso. Nuevo saldo de la cuenta %d: %.2f\n" "\x1b[0m", no_cuenta, usuarios[i].saldo);
             }
-            pthread_mutex_unlock(&mutex);
             return;
         }
     }
@@ -156,7 +205,6 @@ void deposito(int no_cuenta, double monto, int index, int esCarga) {
     } else {
         printf("\x1b[31m" "Número de cuenta no encontrado: %d\n" "\x1b[0m", no_cuenta);
     }
-    pthread_mutex_unlock(&mutex);
 }
 
 void retiro(int no_cuenta, double monto, int index, int esCarga) {
@@ -169,7 +217,6 @@ void retiro(int no_cuenta, double monto, int index, int esCarga) {
         }
         return;
     }
-    pthread_mutex_lock(&mutex);
     for (int i = 0; i < num_usuarios; ++i) {
         if (usuarios[i].no_cuenta == no_cuenta) {
             if (usuarios[i].saldo >= monto) {
@@ -189,7 +236,6 @@ void retiro(int no_cuenta, double monto, int index, int esCarga) {
                     printf("\x1b[31m" "Saldo insuficiente en la cuenta %d\n" "\x1b[0m", no_cuenta);
                 }
             }
-            pthread_mutex_unlock(&mutex);
             return;
         }
     }
@@ -199,7 +245,6 @@ void retiro(int no_cuenta, double monto, int index, int esCarga) {
     } else {
         printf("\x1b[31m" "Número de cuenta no encontrado: %d\n" "\x1b[0m", no_cuenta);
     }
-    pthread_mutex_unlock(&mutex);
 }
 
 void transferencia(int cuenta_origen, int cuenta_destino, double monto, int index, int esCarga) {
@@ -212,7 +257,6 @@ void transferencia(int cuenta_origen, int cuenta_destino, double monto, int inde
         }
         return;
     }
-    pthread_mutex_lock(&mutex);
     Usuario *origen = NULL, *destino = NULL;
     for (int i = 0; i < num_usuarios; ++i) {
         if (usuarios[i].no_cuenta == cuenta_origen) {
@@ -258,7 +302,6 @@ void transferencia(int cuenta_origen, int cuenta_destino, double monto, int inde
             }
         }
     }
-    pthread_mutex_unlock(&mutex);
 }
 
 void consultar_cuenta(int no_cuenta) {
@@ -277,86 +320,13 @@ void consultar_cuenta(int no_cuenta) {
 
 void generar_numeros(int n, int* a, int* b, int* c) {
     int max_diff = 4;
-
-    // Generar un número aleatorio en un rango razonable
     *a = rand() % (n + 1);
-
-    // Generar dos números aleatorios dentro del rango ajustado
     *b = *a + (rand() % (2 * max_diff + 1)) - max_diff;
     *c = *a + (rand() % (2 * max_diff + 1)) - max_diff;
-
-    // Ajustar el tercer número para que la suma sea n
     *c = n - *a - *b;
-
-    // Asegurar que los números no tengan más de 4 unidades de diferencia
     if (abs(*a - *b) > max_diff || abs(*a - *c) > max_diff || abs(*b - *c) > max_diff) {
-        generar_numeros(n, a, b, c);  // Intentar de nuevo si la diferencia es demasiado grande
+        generar_numeros(n, a, b, c);
     }
-}
-
-void* procesar_usuarios(void* arg) {
-    int thread_id = *(int*)arg;
-    int start = thread_id == 0 ? 0 : (thread_id == 1 ? procesado[0] : procesado[0] + procesado[1]);
-    int end = thread_id == 0 ? procesado[0] : (thread_id == 1 ? procesado[0] + procesado[1] : procesado[0] + procesado[1] + procesado[2]);
-
-    for(int x = start; x < end; x ++) {
-        int duplicado = 0;
-        for(int i = 0; i < lineas_usuarios; i ++) {
-            if(usuarios[i].no_cuenta == usuariosTmp[x].no_cuenta) {
-                sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta duplicado %d", usuariosTmp[x].linea, usuariosTmp[x].no_cuenta);
-                errorCargaU++;
-                duplicado = 1;
-                break;
-            }
-        }
-        if(usuariosTmp[x].no_cuenta <= 0) {
-            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta no puede ser menor que 0", usuariosTmp[x].linea);
-            errorCargaU++;
-            continue;
-        } else if(usuariosTmp[x].saldo < 0) {
-            sprintf(r1.errores[errorCargaU], "    - Linea #%d: Saldo no puede ser menor que 0", usuariosTmp[x].linea);
-            errorCargaU++;
-            continue;
-        }
-
-        if(!duplicado) {
-            // Agregar usuario al arreglo
-            usuarios[num_usuarios].no_cuenta = usuariosTmp[x].no_cuenta;
-            strncpy(usuarios[num_usuarios].nombre, usuariosTmp[x].nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
-            usuarios[num_usuarios].saldo = usuariosTmp[x].saldo;
-            num_usuarios++;
-            r1.hilos[thread_id]++;
-        }
-    }
-    return NULL;
-}
-
-void* procesar_operaciones(void* arg) {
-    int thread_id = *(int*)arg;
-    for (int i = thread_id; i < num_operaciones; i += 4) {
-        int operacion = operaciones[i].operacion;
-        int cuenta1 = operaciones[i].cuenta1;
-        int cuenta2 = operaciones[i].cuenta2;
-        double monto = operaciones[i].monto;
-
-        lineas_operaciones ++;
-
-        switch (operacion) {
-            case 1:
-                deposito(cuenta1, monto, thread_id, 1);
-                break;
-            case 2:
-                retiro(cuenta1, monto, thread_id, 1);
-                break;
-            case 3:
-                transferencia(cuenta1, cuenta2, monto, thread_id, 1);
-                break;
-            default:
-                printf("Operación desconocida: %d\n", operacion);
-                break;
-        }
-    }
-    return NULL;
 }
 
 void reporteCargaUsuarios() {
@@ -496,14 +466,14 @@ int main() {
 
 
     // Cargar usuarios en un solo hilo
-    pthread_create(&threads[0], NULL, cargar_usuarios, &thread_ids[0]);
-    pthread_join(threads[0], NULL);
-
-    generar_numeros(lineas_usuarios, &procesado[0], &procesado[1], &procesado[2]);
+    const char* file = "usuarios.json";
+    json_error_t error;
+    json_t *root = json_load_file(file, 0, &error);
+    generar_numeros(json_array_size(root), &procesado[0], &procesado[1], &procesado[2]);
 
     // Procesar usuarios en 3 hilos
     for (int i = 0; i < 3; i++) {
-        pthread_create(&threads[i], NULL, procesar_usuarios, &thread_ids[i]);
+        pthread_create(&threads[i], NULL, cargar_usuarios, &thread_ids[i]);
     }
 
     for (int i = 0; i < 3; i++) {
@@ -517,13 +487,9 @@ int main() {
 
     printf("\x1b[32m" "\nCarga de Operaciones...\n" "\x1b[0m");
 
-    // Cargar operaciones en un hilo
-    pthread_create(&threads[4], NULL, cargar_operaciones, "operaciones.json");
-    pthread_join(threads[4], NULL);
-
     // Procesar operaciones concurrentemente con 4 hilos
     for (int i = 0; i < 4; i++) {
-        pthread_create(&threads[i + 4], NULL, procesar_operaciones, &thread_ids[i]);
+        pthread_create(&threads[i + 4], NULL, cargar_operaciones, &thread_ids[i]);
     }
 
     for (int i = 0; i < 4; i++) {
