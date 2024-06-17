@@ -84,8 +84,7 @@ void* cargar_usuarios(void* i) {
     json_array_foreach(root, index, user) {
         usuariosTmp[lineas_usuarios].linea = lineas_usuarios + 1;
         usuariosTmp[lineas_usuarios].no_cuenta = json_integer_value(json_object_get(user, "no_cuenta"));
-        const char* nombre = json_string_value(json_object_get(user, "nombre"));
-        strncpy(usuarios[num_usuarios].nombre, nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
+        strncpy(usuariosTmp[lineas_usuarios].nombre, json_string_value(json_object_get(user, "nombre")), sizeof(usuariosTmp[lineas_usuarios].nombre) - 1);
         usuariosTmp[lineas_usuarios].saldo = json_real_value(json_object_get(user, "saldo"));
 
         lineas_usuarios++;
