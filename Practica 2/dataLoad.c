@@ -16,6 +16,7 @@ typedef struct {
 } Usuario;
 
 typedef struct {
+    int linea;
     int operacion; // 1: Deposito, 2: Retiro, 3: Transferencia
     int cuenta1;
     int cuenta2; // Solo usado en transferencias
@@ -40,7 +41,9 @@ int errorCargaO = 0;
 ReporteOperaciones r2 = { .hilos = {0, 0, 0, 0}, .operaciones = {0, 0, 0}, .errores = {0} };
 
 Usuario usuarios[MAX_USERS];
+Operacion operaciones[MAX_OPERATIONS];
 int num_usuarios = 0;
+int num_operaciones = 0;
 int lineas_usuarios = 0;
 int lineas_operaciones = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -65,11 +68,7 @@ char* fecha_hora(char* formato) {
 
 // Función para cargar usuarios desde un archivo JSON
 void* cargar_usuarios(void* i) {
-    int n = *((int*) i);
-    char filename[100];
-    sprintf(filename, "usuarios/usuarios%d.json", n + 1);
-
-    const char* file = filename;
+    const char* file = "usuarios.json";
     json_error_t error;
     json_t *root = json_load_file(file, 0, &error);
     if (!root) {
@@ -89,33 +88,33 @@ void* cargar_usuarios(void* i) {
 
         // Verificar si el número de cuenta ya existe
         int i;
+        int duplicado = 0;
         for (i = 0; i < num_usuarios; ++i) {
             if (usuarios[i].no_cuenta == no_cuenta) {
                 sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta duplicado %d", lineas_usuarios, no_cuenta);
                 errorCargaU++;
-                pthread_mutex_unlock(&mutex);
-                continue;
+                duplicado = 1;
+                break;
             }
         }
         // Verificar si el número de cuenta o el saldo son negativos
-        if(no_cuenta < 0) {
+        if(no_cuenta <= 0) {
             sprintf(r1.errores[errorCargaU], "    - Linea #%d: Número de cuenta no puede ser menor que 0", lineas_usuarios);
             errorCargaU++;
-            pthread_mutex_unlock(&mutex);
             continue;
         } else if(saldo < 0) {
             sprintf(r1.errores[errorCargaU], "    - Linea #%d: Saldo no puede ser menor que 0", lineas_usuarios);
             errorCargaU++;
-            pthread_mutex_unlock(&mutex);
             continue;
         }
 
-        // Agregar usuario al arreglo
-        usuarios[num_usuarios].no_cuenta = no_cuenta;
-        strncpy(usuarios[num_usuarios].nombre, nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
-        usuarios[num_usuarios].saldo = saldo;
-        num_usuarios++;
-        r1.hilos[n]++;
+        if(!duplicado) {
+            // Agregar usuario al arreglo
+            usuarios[num_usuarios].no_cuenta = no_cuenta;
+            strncpy(usuarios[num_usuarios].nombre, nombre, sizeof(usuarios[num_usuarios].nombre) - 1);
+            usuarios[num_usuarios].saldo = saldo;
+            num_usuarios++;
+        }
         pthread_mutex_unlock(&mutex);
     }
     json_decref(root);
@@ -123,13 +122,8 @@ void* cargar_usuarios(void* i) {
 }
 
 // Función para realizar operaciones desde un archivo JSON
-void* cargar_operaciones(void* i) {
-    int n = *((int*) i);
-    char filename[100];
-    sprintf(filename, "operaciones/operaciones%d.json", n + 1);
-    // printf("%s\n", filename);
-
-    const char* file = filename;
+void* cargar_operaciones(void* arg) {
+    const char* file = (const char*)arg;
     json_error_t error;
     json_t *root = json_load_file(file, 0, &error);
     if (!root) {
@@ -140,27 +134,19 @@ void* cargar_operaciones(void* i) {
     size_t index;
     json_t *operation;
     json_array_foreach(root, index, operation) {
-        int operacion = json_integer_value(json_object_get(operation, "operacion"));
-        int cuenta1 = json_integer_value(json_object_get(operation, "cuenta1"));
-        int cuenta2 = json_integer_value(json_object_get(operation, "cuenta2"));
-        double monto = json_real_value(json_object_get(operation, "monto"));
-
-        lineas_operaciones ++;
-
-        switch (operacion) {
-            case 1:
-                deposito(cuenta1, monto, n, 1);
-                break;
-            case 2:
-                retiro(cuenta1, monto, n, 1);
-                break;
-            case 3:
-                transferencia(cuenta1, cuenta2, monto, n, 1);
-                break;
-            default:
-                printf("Operación desconocida: %d\n", operacion);
-                break;
+        pthread_mutex_lock(&mutex);
+        if (num_operaciones >= MAX_OPERATIONS) {
+            printf("Error: Demasiadas operaciones\n");
+            pthread_mutex_unlock(&mutex);
+            break;
         }
+
+        operaciones[num_operaciones].operacion = json_integer_value(json_object_get(operation, "operacion"));
+        operaciones[num_operaciones].cuenta1 = json_integer_value(json_object_get(operation, "cuenta1"));
+        operaciones[num_operaciones].cuenta2 = json_integer_value(json_object_get(operation, "cuenta2"));
+        operaciones[num_operaciones].monto = json_real_value(json_object_get(operation, "monto"));
+        num_operaciones++;
+        pthread_mutex_unlock(&mutex);
     }
     json_decref(root);
     // printf("termina: %s\n", filename);
@@ -316,6 +302,50 @@ void consultar_cuenta(int no_cuenta) {
     pthread_mutex_unlock(&mutex);
 }
 
+void* procesar_usuarios(void* arg) {
+    int thread_id = *(int*)arg;
+    int total_threads = 3;
+    int usuarios_por_hilo = num_usuarios / total_threads;
+    int start = thread_id * usuarios_por_hilo;
+    int end = (thread_id == total_threads - 1) ? num_usuarios : start + usuarios_por_hilo;
+
+    r1.hilos[thread_id] = 0;
+    for (int i = start; i < num_usuarios; ++i) {
+        // Simula algún procesamiento para el usuario
+        // printf("Hilo %d procesando usuario %d\n", thread_id, usuarios[i].no_cuenta);
+        r1.hilos[thread_id]++;
+    }
+    return NULL;
+}
+
+void* procesar_operaciones(void* arg) {
+    int thread_id = *(int*)arg;
+    for (int i = thread_id; i < num_operaciones; i += 4) {
+        int operacion = operaciones[i].operacion;
+        int cuenta1 = operaciones[i].cuenta1;
+        int cuenta2 = operaciones[i].cuenta2;
+        double monto = operaciones[i].monto;
+
+        lineas_operaciones ++;
+
+        switch (operacion) {
+            case 1:
+                deposito(cuenta1, monto, thread_id, 1);
+                break;
+            case 2:
+                retiro(cuenta1, monto, thread_id, 1);
+                break;
+            case 3:
+                transferencia(cuenta1, cuenta2, monto, thread_id, 1);
+                break;
+            default:
+                printf("Operación desconocida: %d\n", operacion);
+                break;
+        }
+    }
+    return NULL;
+}
+
 void reporteCargaUsuarios() {
     char nombre[29];
     sprintf(nombre, "carga_%s.log", fecha_hora("%Y_%m_%d-%H_%M_%S"));
@@ -441,12 +471,57 @@ void reporteEstadosCuenta() {
 int main() {
     pthread_mutex_init(&mutex, NULL);
 
-    pthread_t threads[7];
+    pthread_t threads[8];
+    int thread_ids[4];
+
+    // Inicializar los IDs de los hilos
+    for (int i = 0; i < 4; i++) {
+        thread_ids[i] = i;
+    }
+
+    printf("\x1b[32m" "\nCarga de Usuarios...\n" "\x1b[0m");
+
+    // Cargar usuarios en un solo hilo
+    pthread_create(&threads[0], NULL, cargar_usuarios, &thread_ids[0]);
+    pthread_join(threads[0], NULL);
+
+    // Procesar usuarios en 4 hilos
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&threads[i], NULL, procesar_usuarios, &thread_ids[i]);
+    }
+
+    for (int i = 0; i < 3; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    printf("\x1b[32m" "¡Carga de Usuarios Finalizada!\n" "\x1b[0m");
+
+    // Generar el reporte después de cargar y procesar usuarios
+    reporteCargaUsuarios();
+
+    printf("\x1b[32m" "\nCarga de Operaciones...\n" "\x1b[0m");
+
+    // Cargar operaciones en un hilo
+    pthread_create(&threads[4], NULL, cargar_operaciones, "operaciones.json");
+    pthread_join(threads[4], NULL);
+
+    // Procesar operaciones concurrentemente con 4 hilos
+    for (int i = 0; i < 4; i++) {
+        pthread_create(&threads[i + 4], NULL, procesar_operaciones, &thread_ids[i]);
+    }
+
+    for (int i = 0; i < 4; i++) {
+        pthread_join(threads[i + 4], NULL);
+    }
+
+    printf("\x1b[32m" "¡Carga de Operaciones Finalizada!\n" "\x1b[0m");
+
+    reporteCargaOperaciones();
 
     // Menú de operaciones
     int opcion;
     while (1) {
-        printf("Menú de Operaciones:\n1. Deposito\n2. Retiro\n3. Transferencia\n4. Consultar cuenta\n5. Cargar Usuarios\n6. Cargar Operaciones\n7. Generar Estados de Cuenta\n8. Salir\n\nOpción: ");
+        printf("Menú de Operaciones:\n1. Deposito\n2. Retiro\n3. Transferencia\n4. Consultar cuenta\n5. Generar Estados de Cuenta\n6. Salir\n\nOpción: ");
         scanf("%d", &opcion);
 
         int no_cuenta, cuenta_origen, cuenta_destino;
@@ -487,38 +562,10 @@ int main() {
                 printf("\n");
                 break;
             case 5:
-                printf("\x1b[32m" "\nCarga de Usuarios...\n" "\x1b[0m");
-                // Cargar usuarios en 3 hilos
-                for (int i = 0; i < 3; i++) {
-                    index[i] = i;
-                    pthread_create(&threads[i], NULL, cargar_usuarios, &index[i]);
-                }
-
-                for (int i = 0; i < 3; i++) {
-                    pthread_join(threads[i], NULL);
-                }
-                printf("\x1b[32m" "¡Carga de Usuarios Finalizada!\n" "\x1b[0m");
-                reporteCargaUsuarios();
-                break;
-            case 6:
-                printf("\x1b[32m" "\nCarga de Operaciones...\n" "\x1b[0m");
-                // Cargar operaciones en 4 hilos
-                for (int i = 3; i < 7; i++) {
-                    index[i] = i - 3;
-                    pthread_create(&threads[i], NULL, cargar_operaciones, &index[i]);
-                }
-
-                for (int i = 3; i < 7; i++) {
-                    pthread_join(threads[i], NULL);
-                }
-                printf("\x1b[32m" "¡Carga de Operaciones Finalizada!\n" "\x1b[0m");
-                reporteCargaOperaciones();
-                break;
-            case 7:
                 printf("\x1b[32m" "\nEstados de Cuenta...\n" "\x1b[0m");
                 reporteEstadosCuenta();
                 break;
-            case 8:
+            case 6:
                 exit(0);
             default:
                 printf("Opción no válida\n");

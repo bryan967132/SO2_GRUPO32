@@ -1,6 +1,0 @@
-[
-    {"no_cuenta": 123456, "nombre": "María Pérez", "saldo": 2500.50},
-    {"no_cuenta": 987654, "nombre": "Juan Gómez", "saldo": 500.25},
-    {"no_cuenta": 111222, "nombre": "Ana Rodríguez", "saldo": 1000.00},
-    {"no_cuenta": 333444, "nombre": "Pedro Hernández", "saldo": 750.00}
-]
