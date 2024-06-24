@@ -1,0 +1,7 @@
+probe syscall.mmap2 {
+    printf("%-10s%-8d%-25s%-20d%s\n", name, pid(), execname(), length, tz_ctime(gettimeofday_s()))
+}
+
+probe syscall.munmap {
+    printf("%-10s%-8d%-25s%-20d%s\n", name, pid(), execname(), length, tz_ctime(gettimeofday_s()))
+}
