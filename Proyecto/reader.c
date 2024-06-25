@@ -3,10 +3,19 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <mysql/mysql.h>
 
 #define MAX_LINE_LENGTH 256
 
 int i = 0;
+
+struct data {
+    int pid;
+    char nombre[100];
+    char tipo[15];
+    int tamano;
+    char fecha[20];
+};
 
 char* monthToNum(char *month) {
     static char month_num[3];
@@ -28,16 +37,50 @@ char* monthToNum(char *month) {
     return month_num;
 }
 
-void process_line(char *line) {
+void process_line(char *line, MYSQL *conn) {
     char call[10], name[20], _[3], month[4], numDay[3], time[9], year[5];
     int pid, size;
 
     sscanf(line, "%s %d %s %d %s %s %s %s %s", call, &pid, name, &size, _, month, numDay, time, year);
 
-    printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
+    //printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
+
+    struct data data;
+    data.pid = pid;
+    strcpy(data.nombre, name);
+    strcpy(data.tipo, call);
+    data.tamano = size;
+    sprintf(data.fecha, "%s-%s-%s %s", year, monthToNum(month), numDay, time);
+
+    char query[500];
+    sprintf(query, "INSERT INTO Memoria (pid, nombre, tipo, tamano, fecha) VALUES (%d, '%s', '%s', %d, '%s')", data.pid, data.nombre, data.tipo, data.tamano, data.fecha);
+
+    if (mysql_query(conn, query)) {
+        fprintf(stderr, "%s\n", mysql_error(conn));
+    } else {
+        printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
+    }
 }
 
 int main() {
+    // Conexión a base de datos
+    MYSQL *conn;
+    MYSQL_RES *res;
+    MYSQL_ROW row;
+
+    char *server = "proyecto.c7wamm8c8cu3.us-east-2.rds.amazonaws.com";
+    char *user = "admin";
+    char *password = "A5LSfBJTWq2Cq2iiHZFN";
+    char *database = "Proyecto1";
+
+    conn = mysql_init(NULL);
+
+    if (!mysql_real_connect(conn, server, user, password, database, 0, NULL, 0)) {
+        fprintf(stderr, "%s\n", mysql_error(conn));
+        return 1;
+    }
+
+    // Leer archivo
     FILE *file;
     char line[MAX_LINE_LENGTH];
     long last_pos = 0;
@@ -55,7 +98,8 @@ int main() {
 
         // Leer nuevas líneas
         while (fgets(line, MAX_LINE_LENGTH, file) != NULL) {
-            process_line(line); // Procesar líneas
+            // Procesar línea y guardar en base de datos
+            process_line(line, conn);
         }
 
         sleep(1);
