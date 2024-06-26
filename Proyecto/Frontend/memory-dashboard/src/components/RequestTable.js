@@ -5,19 +5,23 @@ const RequestTable = ({ requests }) => {
     <table>
       <thead>
         <tr>
-          <th>PID</th>
-          <th>Llamada</th>
-          <th>Tamaño</th>
+          <th>ID</th>
           <th>Fecha</th>
+          <th>Nombre</th>
+          <th>PID</th>
+          <th>Tamaño (MB)</th>
+          <th>Tipo</th>
         </tr>
       </thead>
       <tbody>
         {requests.map((request, index) => (
           <tr key={index}>
+            <td>{request.id}</td>
+            <td>{new Date(request.fecha).toLocaleString()}</td>
+            <td>{request.nombre}</td>
             <td>{request.pid}</td>
-            <td>{request.call}</td>
-            <td>{request.size}</td>
-            <td>{request.date}</td>
+            <td>{parseFloat(request.tamano_mb).toFixed(2)}</td>
+            <td>{request.tipo}</td>
           </tr>
         ))}
       </tbody>

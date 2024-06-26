@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import io from 'socket.io-client';
 import MemoryPieChart from './components/MemoryPieChart';
 import ProcessTable from './components/ProcessTable';
 import RequestTable from './components/RequestTable';
 import './App.css';
-
-const socket = io('http://localhost:3001');
 
 const App = () => {
   const [memoryData, setMemoryData] = useState([]);
@@ -14,50 +11,39 @@ const App = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch data from endpoint on initial load
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/memory-data');
-        const data = await response.json();
-        setMemoryData(data.pieChartData);
-        setProcesses(data.processes);
-        setRequests(data.requests);
+        // Fetch data from procesos endpoint
+        const responseProcesos = await fetch('http://18.191.237.75:5000/api/procesos');
+        const dataProcesos = await responseProcesos.json();
+        setProcesses(dataProcesos);
+
+        // Transform data for pie chart
+        const transformedPieChartData = dataProcesos.map(process => ({
+          name: process.nombre,
+          memory: parseFloat(process.memoria_mb),
+          percentage: process.porcentaje
+        }));
+        setMemoryData(transformedPieChartData);
+
+        // Fetch data from solicitudes endpoint
+        const responseSolicitudes = await fetch('http://18.191.237.75:5000/api/solicitudes');
+        const dataSolicitudes = await responseSolicitudes.json();
+        setRequests(dataSolicitudes);
+
       } catch (error) {
         setError('No se pudo obtener los datos del servidor');
       }
     };
 
     fetchData();
-
-    // Set up socket connection for real-time updates
-    socket.on('connect_error', () => {
-      setError('No se pudo conectar con el servidor');
-    });
-
-    socket.on('memoryData', (data) => {
-      setError(null); // Clear error if data is received successfully
-      setMemoryData(data.pieChartData);
-      setProcesses(data.processes);
-      setRequests(data.requests);
-    });
-
-    socket.on('disconnect', () => {
-      setError('Desconectado del servidor');
-    });
-
-    return () => {
-      socket.off('memoryData');
-      socket.off('connect_error');
-      socket.off('disconnect');
-    };
   }, []);
 
   return (
     <div className="App">
+      <h1>Dashboard</h1>
       <h1>Proyecto - Lab SOPES 2</h1>
       <h3>201907774, 201908355 , 201944994</h3>
-
-      <h1>Dashboard</h1>
       {error && <p className="error">{error}</p>}
       <div className="charts">
         <MemoryPieChart data={memoryData} />
