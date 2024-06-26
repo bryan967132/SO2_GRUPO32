@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <time.h>
 #include <mysql/mysql.h>
@@ -43,7 +44,7 @@ void process_line(char *line, MYSQL *conn) {
 
     sscanf(line, "%s %d %s %d %s %s %s %s %s", call, &pid, name, &size, _, month, numDay, time, year);
 
-    //printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
+    // printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
 
     struct data data;
     data.pid = pid;
@@ -62,16 +63,63 @@ void process_line(char *line, MYSQL *conn) {
     }
 }
 
+char* trim_whitespace(char* str) {
+    char* end;
+
+    while (isspace((unsigned char)*str)) str++;
+
+    if (*str == 0) return str;
+
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+
+    *(end + 1) = 0;
+
+    return str;
+}
+
+void load_env(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening .env file");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+
+        char *delimiter = strchr(line, '=');
+        if (delimiter != NULL) {
+            *delimiter = '\0';
+            char *key = trim_whitespace(line);
+            char *value = trim_whitespace(delimiter + 1);
+
+            // Enviar variables de entorno
+            setenv(key, value, 1);
+        }
+    }
+
+    fclose(file);
+}
+
 int main() {
+    load_env(".env");
+
     // Conexión a base de datos
     MYSQL *conn;
     MYSQL_RES *res;
     MYSQL_ROW row;
 
-    char *server = "proyecto.c7wamm8c8cu3.us-east-2.rds.amazonaws.com";
-    char *user = "admin";
-    char *password = "A5LSfBJTWq2Cq2iiHZFN";
-    char *database = "Proyecto1";
+    char *server = getenv("SERVER");
+    char *user = getenv("USERDB");
+    char *password = getenv("PASSDB");
+    char *database = getenv("DB");
+
+    printf("Server: %s\n", server);
+    printf("UserDB: %s\n", user);
+    printf("PassDB: %s\n", password);
+    printf("DB: %s\n", database);
 
     conn = mysql_init(NULL);
 
@@ -100,7 +148,7 @@ int main() {
         return 1;
     }
 
-    //fseek(file, 0, SEEK_END); // Puntero en final de archivo
+    // fseek(file, 0, SEEK_END); // Puntero en final de archivo
 
     while (1) {
         last_pos = ftell(file); // Posición actual del puntero
