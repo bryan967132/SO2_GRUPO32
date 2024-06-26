@@ -7,3 +7,9 @@ Practica 2/*.log
 Practica 2/estado_cuenta.json
 Proyecto/*.bin
 Proyecto/*.log
+*/.env
+
+
+# Dependency directories
+Proyecto/Frontend/memory-dashboard/node_modules/
+Proyecto/Server/node_modules/

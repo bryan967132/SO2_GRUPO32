@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <time.h>
 #include <mysql/mysql.h>
@@ -37,13 +38,42 @@ char* monthToNum(char *month) {
     return month_num;
 }
 
+void set_env(const char *filename){
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error abriendo el archivo");
+        exit(1);
+    }
+
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = 0;
+
+        char *delimiter = strchr(line, '=');
+        if (!delimiter) {
+            continue;
+        }
+
+        *delimiter = 0;
+        char *key = line;
+        char *value = delimiter + 1;
+
+        if (setenv(key, value, 1) != 0) {
+            perror("Error al establecer variable de entorno");
+            exit(1);
+        }
+    }
+
+    fclose(file);
+}
+
 void process_line(char *line, MYSQL *conn) {
     char call[10], name[20], _[3], month[4], numDay[3], time[9], year[5];
     int pid, size;
 
     sscanf(line, "%s %d %s %d %s %s %s %s %s", call, &pid, name, &size, _, month, numDay, time, year);
 
-    //printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
+    // printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
 
     struct data data;
     data.pid = pid;
@@ -62,16 +92,57 @@ void process_line(char *line, MYSQL *conn) {
     }
 }
 
+char* trim_whitespace(char* str) {
+    char* end;
+
+    while (isspace((unsigned char)*str)) str++;
+
+    if (*str == 0) return str;
+
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+
+    *(end + 1) = 0;
+
+    return str;
+}
+
+void load_env(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening .env file");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+
+        char *delimiter = strchr(line, '=');
+        if (delimiter != NULL) {
+            *delimiter = '\0';
+            char *key = trim_whitespace(line);
+            char *value = trim_whitespace(delimiter + 1);
+
+            // Enviar variables de entorno
+            setenv(key, value, 1);
+        }
+    }
+
+    fclose(file);
+}
+
 int main() {
+    set_env("../.env");
     // Conexión a base de datos
     MYSQL *conn;
     MYSQL_RES *res;
     MYSQL_ROW row;
 
-    char *server = "proyecto.c7wamm8c8cu3.us-east-2.rds.amazonaws.com";
-    char *user = "admin";
-    char *password = "A5LSfBJTWq2Cq2iiHZFN";
-    char *database = "Proyecto1";
+    char *server = getenv("MYSQL_HOST");
+    char *user = getenv("MYSQL_USER");
+    char *password = getenv("MYSQL_PASS");
+    char *database = getenv("MYSQL_DB");
 
     conn = mysql_init(NULL);
 
@@ -79,6 +150,15 @@ int main() {
         fprintf(stderr, "%s\n", mysql_error(conn));
         return 1;
     }
+
+    // Iniciar systemtap
+    int result = system("sudo stap memory_tracker.stp > memory_tracker.log 2>/dev/null &");
+    if (result == -1) {
+        perror("system");
+        return 1;
+    }
+
+    sleep(1);
 
     // Leer archivo
     FILE *file;
@@ -91,7 +171,7 @@ int main() {
         return 1;
     }
 
-    fseek(file, 0, SEEK_END); // Puntero en final de archivo
+    // fseek(file, 0, SEEK_END); // Puntero en final de archivo
 
     while (1) {
         last_pos = ftell(file); // Posición actual del puntero
