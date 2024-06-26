@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <time.h>
 #include <mysql/mysql.h>
@@ -72,7 +73,7 @@ void process_line(char *line, MYSQL *conn) {
 
     sscanf(line, "%s %d %s %d %s %s %s %s %s", call, &pid, name, &size, _, month, numDay, time, year);
 
-    //printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
+    // printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
 
     struct data data;
     data.pid = pid;
@@ -89,6 +90,46 @@ void process_line(char *line, MYSQL *conn) {
     } else {
         printf("Llamada: %s, PID: %d, Nombre: %s, Tamaño Segmento: %d, Fecha Hora: %s-%s-%s %s\n", call, pid, name, size, year, monthToNum(month), numDay, time);
     }
+}
+
+char* trim_whitespace(char* str) {
+    char* end;
+
+    while (isspace((unsigned char)*str)) str++;
+
+    if (*str == 0) return str;
+
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+
+    *(end + 1) = 0;
+
+    return str;
+}
+
+void load_env(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening .env file");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+
+        char *delimiter = strchr(line, '=');
+        if (delimiter != NULL) {
+            *delimiter = '\0';
+            char *key = trim_whitespace(line);
+            char *value = trim_whitespace(delimiter + 1);
+
+            // Enviar variables de entorno
+            setenv(key, value, 1);
+        }
+    }
+
+    fclose(file);
 }
 
 int main() {
@@ -130,7 +171,7 @@ int main() {
         return 1;
     }
 
-    //fseek(file, 0, SEEK_END); // Puntero en final de archivo
+    // fseek(file, 0, SEEK_END); // Puntero en final de archivo
 
     while (1) {
         last_pos = ftell(file); // Posición actual del puntero

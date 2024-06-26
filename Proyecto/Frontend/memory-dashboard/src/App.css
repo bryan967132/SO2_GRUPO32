@@ -1,0 +1,31 @@
+.App {
+  text-align: center;
+}
+
+.error {
+  color: red;
+}
+
+.charts {
+  width: 25%;
+  margin: auto;
+}
+
+.tables {
+  width: 80%;
+  margin: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #f4f4f4;
+}
