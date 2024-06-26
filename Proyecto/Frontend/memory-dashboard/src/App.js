@@ -54,6 +54,9 @@ const App = () => {
 
   return (
     <div className="App">
+      <h1>Proyecto - Lab SOPES 2</h1>
+      <h3>201907774, 201908355 , 201944994</h3>
+
       <h1>Dashboard</h1>
       {error && <p className="error">{error}</p>}
       <div className="charts">
