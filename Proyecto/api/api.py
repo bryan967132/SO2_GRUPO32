@@ -41,7 +41,9 @@ def get_procesos():
             GROUP BY pid, nombre
             ORDER BY pid
         ''')
-    result = cursor.fetchall()
+    
+    colums = [desc[0] for desc in cursor.description]
+    result = [dict(zip(colums, row)) for row in cursor.fetchall()]
     return jsonify(result)
 
 @app.route('/api/solicitudes', methods=['GET'])
@@ -55,13 +57,15 @@ def get_solicitudes():
                     nombre,
                     tipo,
                     tamano tamano_bytes,
-                    ROUND(tamano/1024/1024, 2) tamano_mb,
+                    ROUND(GREATEST(tamano/1024/1024,0), 2) tamano_mb,
                     fecha
             FROM Memoria
             ORDER BY id
         ''')
-    result = cursor.fetchall()
+    
+    colums = [desc[0] for desc in cursor.description]
+    result = [dict(zip(colums, row)) for row in cursor.fetchall()]
     return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
