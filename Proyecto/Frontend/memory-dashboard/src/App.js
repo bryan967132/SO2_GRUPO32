@@ -1,25 +1,56 @@
-import logo from './logo.svg';
+import React, { useEffect, useState } from 'react';
+import io from 'socket.io-client';
+import MemoryPieChart from './components/MemoryPieChart';
+import ProcessTable from './components/ProcessTable';
+import RequestTable from './components/RequestTable';
 import './App.css';
 
-function App() {
+const socket = io('http://localhost:3001');
+
+const App = () => {
+  const [memoryData, setMemoryData] = useState([]);
+  const [processes, setProcesses] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    socket.on('connect_error', () => {
+      setError('No se pudo conectar con el servidor');
+    });
+
+    socket.on('memoryData', (data) => {
+      setError(null); // Clear error if data is received successfully
+      setMemoryData(data.pieChartData);
+      setProcesses(data.processes);
+      setRequests(data.requests);
+    });
+
+    socket.on('disconnect', () => {
+      setError('Desconectado del servidor');
+    });
+
+    return () => {
+      socket.off('memoryData');
+      socket.off('connect_error');
+      socket.off('disconnect');
+    };
+  }, []);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <h1>Dashboard</h1>
+      {error && <p className="error">{error}</p>}
+      <div className="charts">
+        <MemoryPieChart data={memoryData} />
+      </div>
+      <div className="tables">
+        <h2>Procesos</h2>
+        <ProcessTable processes={processes} />
+        <h2>Solicitudes</h2>
+        <RequestTable requests={requests} />
+      </div>
     </div>
   );
-}
+};
 
 export default App;

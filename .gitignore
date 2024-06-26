@@ -12,3 +12,4 @@ Proyecto/*.env
 
 # Dependency directories
 Proyecto/Frontend/memory-dashboard/node_modules/
+Proyecto/Server/node_modules/
