@@ -7,6 +7,7 @@ Practica 2/*.log
 Practica 2/estado_cuenta.json
 Proyecto/*.bin
 Proyecto/*.log
+Proyecto/*.env
 
 
 # Dependency directories
