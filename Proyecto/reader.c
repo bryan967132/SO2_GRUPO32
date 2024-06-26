@@ -80,6 +80,15 @@ int main() {
         return 1;
     }
 
+    // Iniciar systemtap
+    int result = system("sudo stap memory_tracker.stp > memory_tracker.log 2>/dev/null &");
+    if (result == -1) {
+        perror("system");
+        return 1;
+    }
+
+    sleep(1);
+
     // Leer archivo
     FILE *file;
     char line[MAX_LINE_LENGTH];
@@ -91,7 +100,7 @@ int main() {
         return 1;
     }
 
-    fseek(file, 0, SEEK_END); // Puntero en final de archivo
+    //fseek(file, 0, SEEK_END); // Puntero en final de archivo
 
     while (1) {
         last_pos = ftell(file); // Posición actual del puntero
