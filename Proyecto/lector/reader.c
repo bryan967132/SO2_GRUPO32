@@ -37,6 +37,35 @@ char* monthToNum(char *month) {
     return month_num;
 }
 
+void set_env(const char *filename){
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error abriendo el archivo");
+        exit(1);
+    }
+
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = 0;
+
+        char *delimiter = strchr(line, '=');
+        if (!delimiter) {
+            continue;
+        }
+
+        *delimiter = 0;
+        char *key = line;
+        char *value = delimiter + 1;
+
+        if (setenv(key, value, 1) != 0) {
+            perror("Error al establecer variable de entorno");
+            exit(1);
+        }
+    }
+
+    fclose(file);
+}
+
 void process_line(char *line, MYSQL *conn) {
     char call[10], name[20], _[3], month[4], numDay[3], time[9], year[5];
     int pid, size;
@@ -63,15 +92,16 @@ void process_line(char *line, MYSQL *conn) {
 }
 
 int main() {
+    set_env("../.env");
     // Conexión a base de datos
     MYSQL *conn;
     MYSQL_RES *res;
     MYSQL_ROW row;
 
-    char *server = "proyecto.c7wamm8c8cu3.us-east-2.rds.amazonaws.com";
-    char *user = "admin";
-    char *password = "A5LSfBJTWq2Cq2iiHZFN";
-    char *database = "Proyecto1";
+    char *server = getenv("MYSQL_HOST");
+    char *user = getenv("MYSQL_USER");
+    char *password = getenv("MYSQL_PASS");
+    char *database = getenv("MYSQL_DB");
 
     conn = mysql_init(NULL);
 
