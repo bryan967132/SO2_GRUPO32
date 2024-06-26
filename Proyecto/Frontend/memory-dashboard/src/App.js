@@ -14,6 +14,22 @@ const App = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Fetch data from endpoint on initial load
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/memory-data');
+        const data = await response.json();
+        setMemoryData(data.pieChartData);
+        setProcesses(data.processes);
+        setRequests(data.requests);
+      } catch (error) {
+        setError('No se pudo obtener los datos del servidor');
+      }
+    };
+
+    fetchData();
+
+    // Set up socket connection for real-time updates
     socket.on('connect_error', () => {
       setError('No se pudo conectar con el servidor');
     });
