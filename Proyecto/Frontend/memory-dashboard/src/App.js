@@ -17,11 +17,26 @@ const App = () => {
         const dataProcesos = await responseProcesos.json();
         setProcesses(dataProcesos);
 
-        const transformedPieChartData = dataProcesos.map(process => ({
-          name: process.nombre,
-          memory: parseFloat(process.memoria_mb),
-          percentage: process.porcentaje
-        }));
+        // Transform data for pie chart
+        const sortedProcesses = dataProcesos
+          .map(process => ({
+            name: process.nombre,
+            memory: parseFloat(process.memoria_mb),
+            percentage: parseFloat(process.porcentaje)
+          }))
+          .sort((a, b) => b.memory - a.memory);
+
+        const top10 = sortedProcesses.slice(0, 10);
+        const others = sortedProcesses.slice(10);
+
+        const othersMemory = others.reduce((sum, process) => sum + process.memory, 0);
+        const othersPercentage = others.reduce((sum, process) => sum + process.percentage, 0).toFixed(2);
+
+        const transformedPieChartData = [
+          ...top10,
+          { name: 'Otros', memory: othersMemory, percentage: othersPercentage }
+        ];
+
         setMemoryData(transformedPieChartData);
 
         const responseSolicitudes = await fetch('http://18.191.237.75:5000/api/solicitudes');
@@ -34,7 +49,7 @@ const App = () => {
 
     fetchData();
 
-    const interval = setInterval(fetchData, 2000); // Actualiza cada 2 segundos
+    const interval = setInterval(fetchData, 5000); // Actualiza cada 5 segundos
 
     return () => clearInterval(interval); // Limpia el intervalo al desmontar el componente
   }, []);

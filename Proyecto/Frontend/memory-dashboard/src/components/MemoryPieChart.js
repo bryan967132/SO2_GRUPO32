@@ -10,7 +10,11 @@ const MemoryPieChart = ({ data }) => {
     labels: data.map(d => `${d.name} (${d.percentage}%)`),
     datasets: [{
       data: data.map(d => d.memory),
-      backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#FF5733', '#C70039', '#900C3F', '#581845', '#FFC300', '#DAF7A6', '#FFC0CB'],
+      backgroundColor: [
+        '#FF6384', '#36A2EB', '#FFCE56', '#FF5733', '#C70039', 
+        '#900C3F', '#581845', '#FFC300', '#DAF7A6', '#FFC0CB',
+        '#888888' // Color para "Otros"
+      ],
     }],
   };
 
