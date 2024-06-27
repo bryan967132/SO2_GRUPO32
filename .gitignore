@@ -1,13 +1,8 @@
-Practica 1/*.bin
-Practica 1/parent
-Practica 1/*.txt
-Practica 1/*.log
-Practica 2/*.bin
-Practica 2/*.log
-Practica 2/estado_cuenta.json
-Proyecto/*.bin
-Proyecto/*.log
-*/.env
+**/*.bin
+**/*.txt
+**/*.log
+**/estado_cuenta.json
+**/*.env
 
 
 # Dependency directories
